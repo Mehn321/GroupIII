@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot - Customer Support</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/MTLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+            max-height: 800px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 3px solid #764ba2;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .message {
+            display: flex;
+            gap: 10px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message.bot {
+            justify-content: flex-start;
+        }
+        
+        .message-content {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            word-wrap: break-word;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.bot .message-content {
+            background: white;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .message-meta {
+            font-size: 11px;
+            color: #999;
+            padding: 0 5px;
+        }
+        
+        .message.bot .message-meta {
+            order: -1;
+        }
+        
+        .match-indicator {
+            font-size: 11px;
+            margin-top: 5px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .match-indicator.kb {
+            color: #90EE90;
+        }
+        
+        .match-indicator.fallback {
+            color: #FFB6C1;
+        }
+        
+        .input-section {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+        }
+        
+        input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            border-color: #667eea;
+        }
+        
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 12px 16px;
+        }
+        
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #667eea;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite;
+        }
+        
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes bounce {
+            0%, 80%, 100% {
+                opacity: 0.3;
+                transform: translateY(0);
+            }
+            40% {
+                opacity: 1;
+                transform: translateY(-10px);
+            }
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+        }
+        
+        .empty-state h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .example-queries {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 20px;
+        }
+        
+        .example-btn {
+            padding: 8px 12px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #555;
+            transition: all 0.2s;
+        }
+        
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        
+        .stats-section {
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .admin-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+        }
+
+        .admin-link:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .model-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .model-modal.show {
+            display: flex;
+        }
+
+        .model-content {
+            position: relative;
+            background-color: white;
+            margin: auto;
+            padding: 0;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 90%;
+            height: 90%;
+            max-width: 1000px;
+            max-height: 800px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .model-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .model-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .close-model {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+
+        .close-model:hover {
+            transform: scale(1.2);
+        }
+
+        #model-canvas {
+            flex: 1;
+            width: 100% !important;
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+        }
+
+        .model-controls {
+            padding: 15px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        #model-btn {
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #model-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #model-btn:active {
+            transform: translateY(0);
+        }
+
+        .model-description {
+            background: white;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            color: #333;
+            font-size: 14px;
+            line-height: 1.6;
+            font-weight: 500;
+        }
+
+        .model-description strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <a href="admin.html" class="admin-link">Admin Panel</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Shopping Assistant</h1>
+            <p>Powered by AI Earl</p>
+        </div>
+        
+        <div class="chat-container" id="chatContainer">
+            <div class="empty-state">
+                <h2>Welcome! 👋</h2>
+                <p>Ask me anything about orders, shipping, returns, or payments.</p>
+                
+                <div class="example-queries">
+                    <button class="example-btn" onclick="sendQuery('What is your return policy?')">What is your return policy?</button>
+                    <button class="example-btn" onclick="sendQuery('How long does shipping take?')">How long does shipping take?</button>
+                    <button class="example-btn" onclick="sendQuery('Can I track my order?')">Can I track my order?</button>
+                    <button class="example-btn" onclick="sendQuery('What payment methods do you accept?')">What payment methods do you accept?</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="input-section">
+            <div class="input-wrapper">
+                <input 
+                    type="text" 
+                    id="queryInput" 
+                    placeholder="Type your question here..."
+                    onkeypress="handleKeyPress(event)"
+                />
+                <button onclick="sendMessage()" id="sendBtn">Send</button>
+                <button id="model-btn" onclick="openModelModal()">View 3D</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3D Model Modal -->
+    <div id="modelModal" class="model-modal">
+        <div class="model-content">
+            <div class="model-header">
+                <h2>3D Product Model</h2>
+                <button class="close-model" onclick="closeModelModal()">&times;</button>
+            </div>
+            <div class="model-description">
+                <strong>3D Model</strong> - Displaying the 3D model loaded from 3DModel.obj 📦
+            </div>
+            <canvas id="model-canvas"></canvas>
+            <div class="model-controls">
+                Use your mouse to rotate, scroll to zoom, right-click and drag to pan
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isLoading = false;
+        const API_URL = 'api/chatbot.php';
+        let threeScene, threeCamera, threeRenderer;
+        let modelLoaded = false;
+        
+        function openModelModal() {
+            const modal = document.getElementById('modelModal');
+            modal.classList.add('show');
+            
+            if (!modelLoaded) {
+                // Wait a frame for the modal to be fully laid out before initializing
+                requestAnimationFrame(() => {
+                    initThreeJS();
+                    loadModel();
+                    modelLoaded = true;
+                });
+            }
+        }
+        
+        function closeModelModal() {
+            const modal = document.getElementById('modelModal');
+            modal.classList.remove('show');
+        }
+        
+        window.onclick = function(event) {
+            const modal = document.getElementById('modelModal');
+            if (event.target == modal) {
+                closeModelModal();
+            }
+        }
+        
+        function initThreeJS() {
+            const canvas = document.getElementById('model-canvas');
+            const container = canvas.parentElement;
+            const width = canvas.clientWidth || container.clientWidth;
+            const height = canvas.clientHeight || container.clientHeight;
+            
+            // Set canvas drawing buffer to match display size
+            canvas.width = width;
+            canvas.height = height;
+            
+            console.log('Initializing Three.js', width, height);
+            
+            // Scene setup
+            threeScene = new THREE.Scene();
+            threeScene.background = new THREE.Color(0xeeeeee);
+            
+            // Camera
+            threeCamera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            threeCamera.position.set(0, 0, 100);
+            threeCamera.lookAt(0, 0, 0);
+            
+            // Renderer
+            threeRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+            threeRenderer.setSize(width, height);
+            threeRenderer.setPixelRatio(window.devicePixelRatio);
+            threeRenderer.shadowMap.enabled = true;
+            
+            console.log('Renderer created:', threeRenderer.capabilities.maxTextures);
+            
+            // Lighting - improved
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+            threeScene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            directionalLight.position.set(50, 50, 50);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.far = 500;
+            threeScene.add(directionalLight);
+            
+            const pointLight = new THREE.PointLight(0xffffff, 0.8);
+            pointLight.position.set(-100, 50, -100);
+            threeScene.add(pointLight);
+            
+            // Mouse controls
+            let isDragging = false;
+            let previousMousePosition = { x: 0, y: 0 };
+            let rotation = { x: 0, y: 0 };
+            
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.clientX - previousMousePosition.x;
+                    const deltaY = e.clientY - previousMousePosition.y;
+                    
+                    rotation.y += deltaX * 0.01;
+                    rotation.x += deltaY * 0.01;
+                    
+                    // Find the model (last non-light object)
+                    for (let i = threeScene.children.length - 1; i >= 0; i--) {
+                        const child = threeScene.children[i];
+                        if (child instanceof THREE.Group || child instanceof THREE.Mesh) {
+                            if (!child.isLight) {
+                                child.rotation.y = rotation.y;
+                                child.rotation.x = rotation.x;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    previousMousePosition = { x: e.clientX, y: e.clientY };
+                }
+            });
+            
+            canvas.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+            
+            canvas.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
+            
+            // Zoom with scroll
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                threeCamera.position.z += e.deltaY * 0.5;
+                threeCamera.position.z = Math.max(5, Math.min(200, threeCamera.position.z));
+            }, false);
+            
+            // Animation loop
+            function animate() {
+                requestAnimationFrame(animate);
+                threeRenderer.render(threeScene, threeCamera);
+            }
+            animate();
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                const newWidth = canvas.clientWidth || container.clientWidth;
+                const newHeight = canvas.clientHeight || container.clientHeight;
+                if (newWidth > 0 && newHeight > 0) {
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    threeCamera.aspect = newWidth / newHeight;
+                    threeCamera.updateProjectionMatrix();
+                    threeRenderer.setSize(newWidth, newHeight);
+                }
+            });
+        }
+        
+        function loadModel() {
+            console.log('Checking loaders:', typeof THREE.MTLLoader, typeof THREE.OBJLoader);
+            
+            if (typeof THREE.MTLLoader === 'undefined' || typeof THREE.OBJLoader === 'undefined') {
+                console.log('Loaders not found, loading from alternative source');
+                loadLoaderScript();
+                return;
+            }
+            
+            const mtlLoader = new THREE.MTLLoader();
+            mtlLoader.setPath('3d%20model/');
+            
+            mtlLoader.load('3DModel.mtl', (materials) => {
+                console.log('MTL loaded successfully');
+                materials.preload();
+                
+                const objLoader = new THREE.OBJLoader();
+                objLoader.setMaterials(materials);
+                objLoader.load('3d%20model/3DModel.obj', (object) => {
+                    console.log('OBJ loaded successfully', object);
+                    addModelToScene(object);
+                }, undefined, (error) => {
+                    console.error('Error loading OBJ:', error);
+                    loadOBJDirect();
+                });
+            }, undefined, (error) => {
+                console.error('Error loading MTL:', error);
+                loadOBJDirect();
+            });
+        }
+        
+        function loadOBJDirect() {
+            console.log('Loading OBJ directly without MTL');
+            if (typeof THREE.OBJLoader === 'undefined') {
+                console.error('OBJLoader not available, showing test geometry');
+                showTestGeometry();
+                return;
+            }
+            
+            const objLoader = new THREE.OBJLoader();
+            objLoader.load('3d%20model/3DModel.obj', (object) => {
+                console.log('OBJ loaded without MTL');
+                
+                object.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material = new THREE.MeshPhongMaterial({ 
+                            color: 0x888888,
+                            shininess: 100
+                        });
+                    }
+                });
+                
+                addModelToScene(object);
+            }, undefined, (error) => {
+                console.error('Error loading OBJ direct:', error);
+                showTestGeometry();
+            });
+        }
+        
+        function addModelToScene(object) {
+            // Remove previous model if exists
+            const existingModel = threeScene.children.find(child => 
+                (child instanceof THREE.Group || child instanceof THREE.Mesh) && !child.isLight
+            );
+            if (existingModel) {
+                threeScene.remove(existingModel);
+            }
+            
+            object.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    // Fix KIRI Engine scan: render both sides and correct normals
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(m => { m.side = THREE.DoubleSide; });
+                        } else {
+                            child.material.side = THREE.DoubleSide;
+                        }
+                    }
+                    // Recompute normals to fix shading distortion
+                    if (child.geometry) {
+                        child.geometry.computeVertexNormals();
+                        child.geometry.computeBoundingBox();
+                    }
+                }
+            });
+            
+            // Use a wrapper group to avoid scale/position conflicts
+            const wrapper = new THREE.Group();
+            wrapper.add(object);
+            
+            // Compute bounding box of original geometry
+            const box = new THREE.Box3().setFromObject(object);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            
+            // Center the model by offsetting the inner object
+            object.position.sub(center);
+            
+            // Scale the wrapper uniformly to a target size
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0) {
+                const targetSize = 40;
+                const scale = targetSize / maxDim;
+                wrapper.scale.set(scale, scale, scale);
+            }
+            
+            threeScene.add(wrapper);
+            
+            // Position camera to nicely frame the model
+            const fov = threeCamera.fov * (Math.PI / 180);
+            const dist = 40 / (2 * Math.tan(fov / 2)) * 1.5;
+            threeCamera.position.set(0, 10, dist);
+            threeCamera.lookAt(0, 0, 0);
+            
+            console.log('Model added to scene, size:', size);
+        }
+        
+        function loadLoaderScript() {
+            // Load OBJLoader inline as fallback
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js';
+            script.onload = () => {
+                console.log('OBJLoader loaded');
+                loadOBJDirect();
+            };
+            script.onerror = () => {
+                console.error('Failed to load OBJLoader');
+                showTestGeometry();
+            };
+            document.head.appendChild(script);
+        }
+        
+        function showTestGeometry() {
+            console.log('Showing test geometry');
+            const geometry = new THREE.BoxGeometry(30, 30, 30);
+            const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+            const cube = new THREE.Mesh(geometry, material);
+            cube.castShadow = true;
+            cube.receiveShadow = true;
+            threeScene.add(cube);
+        }
+        
+        function sendMessage() {
+            const query = document.getElementById('queryInput').value.trim();
+            if (query && !isLoading) {
+                sendQuery(query);
+            }
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !isLoading) {
+                sendMessage();
+            }
+        }
+        
+        function sendQuery(query) {
+            const chatContainer = document.getElementById('chatContainer');
+            const queryInput = document.getElementById('queryInput');
+            const sendBtn = document.getElementById('sendBtn');
+            
+            // Clear empty state
+            const emptyState = chatContainer.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            // Add user message
+            addMessage(query, 'user');
+            queryInput.value = '';
+            
+            // Show typing indicator
+            isLoading = true;
+            sendBtn.disabled = true;
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot typing-indicator-container';
+            typingDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+            chatContainer.appendChild(typingDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Send request to API
+            fetch(API_URL + '?action=query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query: query })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                typingDiv.remove();
+                
+                if (data.success) {
+                    let botMessage = data.answer;
+                    if (data.source === 'knowledge_base') {
+                        botMessage += '\n\n📚 <span style="font-size: 11px; opacity: 0.8;">From Knowledge Base (Match: ' + 
+                                     (data.match_score * 100).toFixed(0) + '%)</span>';
+                    } else if (data.source === 'fallback') {
+                        botMessage += '\n\n💡 <span style="font-size: 11px; opacity: 0.8;">Auto-Response</span>';
+                    }
+                    addMessage(botMessage, 'bot');
+                    
+                    // Check if query mentions "samsung" or "galaxy" and open 3D model
+                    if (query.toLowerCase().includes('samsung') || query.toLowerCase().includes('galaxy')) {
+                        setTimeout(() => {
+                            openModelModal();
+                        }, 500);
+                    }
+                } else {
+                    addMessage('Error: ' + (data.error || 'Unknown'), 'bot');
+                }
+                isLoading = false;
+                sendBtn.disabled = false;
+                queryInput.focus();
+            })
+            .catch(error => {
+                typingDiv.remove();
+                console.error('API Error:', error);
+                addMessage('⚠️ Connection Failed<br/><br/>Steps to fix:<br/>1. Open: <strong>http://localhost/chatbot/diagnose.php</strong><br/>2. Follow the instructions shown<br/><br/>Or manually:<br/>• Run: http://localhost/chatbot/setup_db.php<br/>• Run: http://localhost/chatbot/insert_sample_data.php<br/>• Ensure MySQL is running in XAMPP', 'bot');
+                isLoading = false;
+                sendBtn.disabled = false;
+            });
+        }
+        
+        function addMessage(message, sender) {
+            const chatContainer = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + sender;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = message.replace(/\n/g, '<br>');
+            
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>
